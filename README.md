@@ -21,8 +21,8 @@ Configure one ore more payment backends
     SHOP_PAYMENT_BACKENDS = [
         'django_shop_payer_backend.backends.PayerCreditCardPaymentBackend',
         'django_shop_payer_backend.backends.PayerBankPaymentBackend',
-        # 'django_shop_payer_backend.backends.PayerInvoicePaymentBackend',  # Not implemented yet
-        # 'django_shop_payer_backend.backends.PayerPhonePaymentBackend',    # Not implemented yet
+        'django_shop_payer_backend.backends.PayerInvoicePaymentBackend',
+        'django_shop_payer_backend.backends.PayerPhonePaymentBackend',
     ]
 
 
