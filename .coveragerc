@@ -1,0 +1,3 @@
+[run]
+source = django_shop_payer_backend
+branch = 1
