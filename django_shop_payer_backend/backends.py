@@ -4,6 +4,8 @@ from shop.payment.backends.prepayment import ForwardFundBackend
 from django.conf.urls import patterns, url
 from django.conf import settings
 from django.core.urlresolvers import reverse
+from django.http import HttpResponse
+import logging
 
 from decimal import Decimal
 from django.utils import timezone
@@ -13,11 +15,12 @@ from django.utils.translation import ugettext_lazy as _
 from django.shortcuts import render_to_response
 from shop.models.ordermodel import Order, OrderPayment
 from shop.models.cartmodel import Cart
-from shop.util.decorators import on_method, order_required
-from shop.order_signals import confirmed
+from shop.util.decorators import on_method, shop_login_required, order_required
+from shop.order_signals import confirmed, completed
 
-from helper import payer_order_item_from_order_item, buyer_details_from_user
+from helper import payer_order_item_from_order_item, buyer_details_from_user, payer_order_item_from_extra_order_price
 from payer_api.postapi import PayerPostAPI
+from payer_api.xml import PayerXMLDocument
 from payer_api.order import (
     PayerProcessingControl,
     PayerBuyerDetails,
@@ -25,61 +28,83 @@ from payer_api.order import (
     PayerOrder,
 )
 
-from payer_api import DEBUG_MODE_SILENT
+from payer_api import (
+    DEBUG_MODE_SILENT,
+    PAYMENT_METHOD_CARD,
+    PAYMENT_METHOD_BANK,
+    PAYMENT_METHOD_PHONE,
+    PAYMENT_METHOD_INVOICE,
+)
 from django.contrib.sites.shortcuts import get_current_site
 from forms import PayerRedirectForm
-import abc
 
 
+logger = logging.getLogger('django.request')
 
-class BasePayerBackend(object):
-    __metaclass__  = abc.ABCMeta
+
+IP_WHITELIST = getattr(settings, 'SHOP_PAYER_BACKEND_IP_WHITELIST', [])
+IP_BLACKLIST = getattr(settings, 'SHOP_PAYER_BACKEND_IP_BLACKLIST', [])
+
+class GenericPayerBackend(object):
 
     url_namespace = 'payer'
-    backend_name = _('Advance payment')
+    backend_name = _('Payer')
     template = 'payer_backend/redirect.html'
+    payment_methods = [
+        PAYMENT_METHOD_CARD,
+        PAYMENT_METHOD_BANK,
+        PAYMENT_METHOD_PHONE,
+        PAYMENT_METHOD_INVOICE,
+    ]
 
     def __init__(self, shop):
         self.shop = shop
 
         self.api = PayerPostAPI(
-            agent_id=getattr(settings, 'SHOP_PAYMENT_BACKEND_PAYER_AGENT_ID', ''),
-            key_1=getattr(settings, 'SHOP_PAYMENT_BACKEND_PAYER_ID1', ''),
-            key_2=getattr(settings, 'SHOP_PAYMENT_BACKEND_PAYER_ID2', ''),
-            debug_mode=getattr(settings, 'SHOP_PAYMENT_BACKEND_DEBUG_MODE', DEBUG_MODE_SILENT),
-            test_mode=getattr(settings, 'SHOP_PAYMENT_BACKEND_TEST_MODE', False),
+            agent_id=getattr(settings, 'SHOP_PAYER_BACKEND_AGENT_ID', ''),
+            key_1=getattr(settings, 'SHOP_PAYER_BACKEND_ID1', ''),
+            key_2=getattr(settings, 'SHOP_PAYER_BACKEND_ID2', ''),
+            payment_methods=self.payment_methods,
+            test_mode=getattr(settings, 'SHOP_PAYER_BACKEND_TEST_MODE', False),
+            debug_mode=getattr(settings, 'SHOP_PAYER_BACKEND_DEBUG_MODE', DEBUG_MODE_SILENT),
+            hide_details=getattr(settings, 'SHOP_PAYER_BACKEND_HIDE_DETAILS', False),
         )
 
+        for ip in IP_WHITELIST:
+            self.api.add_whitelist_ip(ip)
+
+        for ip in IP_BLACKLIST:
+            self.api.add_blacklist_ip(ip)
+
+
+    def get_url_name(self, name=None):
+        if not name:
+            return self.url_namespace
+        return '%s-%s' % (self.url_namespace, name,)
 
     def get_urls(self):
         urlpatterns = patterns('',
-            url(r'^$', self.payer_redirect_view, name='payer-redirect'),
+            url(r'^$', self.payer_redirect_view, name=self.get_url_name()),
+            url(r'^authorize/$', self.callback_notification_view, name=self.get_url_name('authorize')),
+            url(r'^settle/$', self.callback_notification_view, name=self.get_url_name('settle')),
         )
         return urlpatterns
-
-
-    def build_absolute_url(self, request, path):
-        url_scheme = 'https' if request.is_secure() else 'http'
-        url_domain = get_current_site(request).domain
-
-        return '%s://%s%s' % (url_scheme, url_domain, path,)
 
     def get_processing_control(self, request):
 
         return PayerProcessingControl(
-            success_redirect_url=self.build_absolute_url(request, "/webshop/success/"),
-            authorize_notification_url=self.build_absolute_url(request, "/webshop/auth/"),
-            settle_notification_url=self.build_absolute_url(request, "/webshop/settle/"),
-            redirect_back_to_shop_url=self.build_absolute_url(request, reverse('shop_welcome')),
+            success_redirect_url=request.build_absolute_uri(self.shop.get_finished_url()),
+            authorize_notification_url=request.build_absolute_uri(reverse(self.get_url_name('authorize'))),
+            settle_notification_url=request.build_absolute_uri(reverse(self.get_url_name('settle'))),
+            redirect_back_to_shop_url=request.build_absolute_uri(self.shop.get_cancel_url()),
         )
 
     # @on_method(shop_login_required)
     @on_method(order_required)
     def payer_redirect_view(self, request):
         """
-        This simple view does nothing but record the "payment" as being
-        complete since we trust the delivery guy to collect money, and redirect
-        to the success page. This is the most simple case.
+        This view generates the order XML data and other key-value pairs needed,
+        outputs the as hidden input elemens in a form and redirects to Payer.
         """
 
         order = self.shop.get_order(request)
@@ -99,6 +124,9 @@ class BasePayerBackend(object):
         for order_item in order.items.all():
             payer_order.add_order_item(payer_order_item_from_order_item(order_item))
 
+        for extra_order_price in order.extraorderpricefield_set.all():
+            payer_order.add_order_item(payer_order_item_from_extra_order_price(extra_order_price))
+
         for info in order.extra_info.all():
             payer_order.add_info_line(info.text())
 
@@ -108,86 +136,135 @@ class BasePayerBackend(object):
         redirect_data = self.api.get_post_data()
         form = PayerRedirectForm(redirect_data=redirect_data)
 
-        xml_data = self.api.get_xml_data(pretty_print=True)
-
-
-        context = RequestContext(request, {
+        ctx_data = {
             'order': order,
             'redirect_data': redirect_data,
             'form_action': self.api.get_post_url(),
             'form': form,
-            'xml_data': xml_data,
-        })
+        }
+
+        if settings.DEBUG:
+            ctx_data['xml_data'] = self.api.get_xml_data(pretty_print=True)
+
+        context = RequestContext(request, ctx_data)
 
         return render_to_response(self.template, context)
 
-    # @on_method(shop_login_required)
-    # @on_method(order_required)
-    # def payment_completed():
-    #     order = self.shop.get_order(request)
+    def is_valid_remote_addr(self, request):
+        def get_remote_addr(request):
+            x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+            if x_forwarded_for:
+                ip = x_forwarded_for.split(',')[0]
+            else:
+                ip = request.META.get('REMOTE_ADDR')
+            return ip
 
-    #     self.shop.confirm_payment(
-    #         order, self.shop.get_order_total(order), "None",
-    #         self.backend_name)
+        try:
+            remote_addr = get_remote_addr(request)
 
-    #     return HttpResponseRedirect(self.shop.get_finished_url())
+            return self.api.validate_callback_ip(remote_addr)
+        except Exception, e:
+            logging.error(u"IP address callback did not validate: %s" % unicode(e))
 
-
-    # def _create_confirmed_order(self, order, transaction_id):
-    #     """
-    #     Create an order from the current cart but does not mark it as payed.
-    #     Instead mark the order as CONFIRMED only, as somebody manually has to
-    #     check bank account statements and mark the payments.
-    #     """
-    #     OrderPayment.objects.create(order=order, amount=Decimal(0),
-    #         transaction_id=transaction_id, payment_method=self.backend_name)
-
-    #     # Confirm the current order
-    #     order.status = Order.CONFIRMED
-    #     order.save()
-
-    #     # empty the related cart
-    #     try:
-    #         cart = Cart.objects.get(pk=order.cart_pk)
-    #         cart.empty()
-    #     except Cart.DoesNotExist:
-    #         pass
-    #     confirmed.send(sender=self, order=order)
+        return False
 
 
+    def is_valid_callback(self, request):
+
+        try:
+            url = request.build_absolute_uri(request.get_full_path())
+            return self.api.validate_callback_url(url)
+        except Exception, e:
+            logging.error(u"Callback URL did not validate: %s" % unicode(e))
+
+        return False
 
 
-class PayerCreditCardPaymentBackend(BasePayerBackend):
+    def callback_notification_view(self, request):
+        valid_callback =  self.is_valid_remote_addr(request) and self.is_valid_callback(request)
 
-    url_namespace = 'payer-redirect'
+        if valid_callback:
+            try:
+                self.handle_order_notifications(request.GET)
+            except Exception, e:
+                logging.error(u"Error handling order notification: %s" % unicode(e))
+
+        return HttpResponse("TRUE" if valid_callback else "FALSE", content_type="text/plain")
+
+
+    def handle_order_notifications(self, data):
+
+        order_id = data.get(PayerXMLDocument.ORDER_ID_URL_PARAMETER_NAME, data.get('payer_merchant_reference_id', None))
+        payment_method = data.get('payer_payment_type', 'unknown')
+        transaction_id = data.get('payer_payment_id', data.get('payread_payment_id', None))
+        testmode = bool(data.get('payer_testmode', 'false') == 'true')
+        callback_type = data.get('payer_callback_type', None).lower()
+        added_fee = data.get('payer_added_fee', 0)
+
+        if order_id is not None:
+
+            order = Order.objects.get(pk=order_id)
+
+            if callback_type == 'auth':
+
+                # Payment approved, update order status, empty cart
+                order.status = Order.CONFIRMED
+                order.save()
+
+                try:
+                    cart = Cart.objects.get(pk=order.cart_pk)
+                    cart.empty()
+                except Cart.DoesNotExist:
+                    pass
+
+                confirmed.send(sender=self, order=order)
+
+            elif callback_type == 'settle':
+
+                # Payment completed, update order status, add payment
+                order = Order.objects.get(pk=order_id)
+                order.status = Order.COMPLETED
+
+                self.shop.confirm_payment(order, self.shop.get_order_total(order), transaction_id, u"Payer %s (%s)" % (unicode(self.backend_name).lower(), payment_method,))
+
+                completed.send(sender=self, order=order)
+
+
+
+class PayerCreditCardPaymentBackend(GenericPayerBackend):
+
+    url_namespace = 'payer-card'
     backend_name = _('Credit card')
-
-    # def get_urls(self):
-    #     urlpatterns = patterns('',
-    #         url(r'^$', self.advance_payment_view, name='payer-creditcard'),
-    #     )
-    #     return urlpatterns
+    payment_methods = [
+        PAYMENT_METHOD_CARD,
+    ]
 
 
-class PayerBankPaymentBackend(BasePayerBackend):
+class PayerBankPaymentBackend(GenericPayerBackend):
 
-    url_namespace = 'payer-redirect'
+    url_namespace = 'payer-bank'
     backend_name = _('Bank payment')
-
-    # def get_urls(self):
-    #     urlpatterns = patterns('',
-    #         url(r'^$', self.advance_payment_view, name='payer-bankpayment'),
-    #     )
-    #     return urlpatterns
+    payment_methods = [
+        PAYMENT_METHOD_BANK,
+    ]
 
 
-class PayerPhonePaymentBackend(object):
+class PayerPhonePaymentBackend(GenericPayerBackend):
 
-    def __init__(self):
-        raise NotImplementedError("Not implemented yet")
-
-
-class PayerInvoicePaymentBackend(object):
+    url_namespace = 'payer-phone'
+    backend_name = _('Phone payment')
+    payment_methods = [
+        PAYMENT_METHOD_PHONE,
+    ]
 
     def __init__(self):
         raise NotImplementedError("Not implemented yet")
+
+
+class PayerInvoicePaymentBackend(GenericPayerBackend):
+
+    url_namespace = 'payer-invoice'
+    backend_name = _('Invoice')
+    payment_methods = [
+        PAYMENT_METHOD_INVOICE,
+    ]
