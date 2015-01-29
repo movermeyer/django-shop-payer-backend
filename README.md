@@ -1,4 +1,4 @@
-Django SHOP payment backend for [Payer](http://payer.se).
+Django SHOP payment backend for [Payer](http://payer.se). Uses [python-payer-api](https://github.com/dessibelle/python-payer-api) for interacting with the API.
 
 
 Installation
