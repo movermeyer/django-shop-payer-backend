@@ -127,8 +127,15 @@ class GenericPayerBackend(object):
         for extra_order_price in order.extraorderpricefield_set.all():
             payer_order.add_order_item(payer_order_item_from_extra_order_price(extra_order_price))
 
+        def chunks(l, n):
+            """ Yield successive n-sized chunks from l.
+            """
+            for i in xrange(0, len(l), n):
+                yield l[i:i+n]
+
         for info in order.extra_info.all():
-            payer_order.add_info_line(info.text())
+            for t in list(chunks(info.text, 255)):
+                payer_order.add_info_line(t)
 
         self.api.set_processing_control(self.get_processing_control(request))
         self.api.set_order(payer_order)

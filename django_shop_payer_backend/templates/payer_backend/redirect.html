@@ -5,17 +5,7 @@
 </head>
 <body>
 
-    <pre>
-
-        {{ xml_data }}
-
-    </pre>
-
-    <form method="post" action="{{ form_action }}">
-        {{ form }}
-
-        <input type="submit">
-    </form>
+{% include "payer_backend/redirect-content.html" %}
 
 </body>
 </html>
