@@ -25,6 +25,12 @@ Configure one ore more payment backends
         'django_shop_payer_backend.backends.PayerPhonePaymentBackend',
     ]
 
+You could also use the `GenericPayerBackend` in order to let the user choose
+payment method *after* being redirected to Payer, or define a subclass of your
+own, listing a custom set of methods in the `payment_methods` property. This
+might be a good option if you are using the Payer backend along with other
+backends such as Paypal etc. 
+
 
 Configuration
 =============
