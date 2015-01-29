@@ -1,0 +1,21 @@
+{% load i18n %}
+<html>
+<head>
+    <title>{% trans "Redirecting to Payer" %}</title>
+</head>
+<body>
+
+    <pre>
+
+        {{ xml_data }}
+
+    </pre>
+
+    <form method="post" action="{{ form_action }}">
+        {{ form }}
+
+        <input type="submit">
+    </form>
+
+</body>
+</html>
