@@ -1,8 +1,7 @@
 sudo: no
 language: python
 install:
-  - pip install django-shop
-  - pip install -e "git+git://github.com/dessibelle/python-payer-api.git@master#egg=python-payer-api"
+  - pip install tox coveralls
 script:
   - tox
 env:

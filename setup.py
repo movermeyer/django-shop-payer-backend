@@ -27,6 +27,7 @@ setup(
     download_url="https://github.com/dessibelle/django-shop-payer-backend/archive/%s.tar.gz" % VERSION,
     packages=['django_shop_payer_backend'],
     install_requires=install_requires,
+    dependency_links = ['http://github.com/dessibelle/python-payer-api/tarball/master#egg=python-payer-api-0.1'],
     classifiers=CLASSIFIERS,
     license="MIT",
 )
