@@ -1,7 +1,4 @@
-import os
 from distutils.core import setup
-from setuptools import find_packages
-
 
 VERSION = __import__("django_shop_payer_backend").VERSION
 

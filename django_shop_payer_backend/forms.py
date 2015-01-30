@@ -3,7 +3,6 @@ from django import forms
 
 class PayerRedirectForm(forms.Form):
 
-
     def __init__(self, *args, **kwargs):
 
         self.redirect_data = kwargs.pop('redirect_data', {})

@@ -1,32 +1,23 @@
 # -*- coding: utf-8 -*-
 from django.utils.translation import ugettext_lazy as _
-from shop.payment.backends.prepayment import ForwardFundBackend
 from django.conf.urls import patterns, url
 from django.conf import settings
 from django.core.urlresolvers import reverse
 from django.http import HttpResponse
 import logging
 
-from decimal import Decimal
-from django.utils import timezone
-from django.conf.urls import patterns, url
 from django.template import RequestContext
-from django.utils.translation import ugettext_lazy as _
 from django.shortcuts import render_to_response
-from shop.models.ordermodel import Order, OrderPayment
+from shop.models.ordermodel import Order
 from shop.models.cartmodel import Cart
-from shop.util.decorators import on_method, shop_login_required, order_required
+from shop.util.decorators import on_method, order_required  # , shop_login_required
 from shop.order_signals import confirmed, completed
 
+from forms import PayerRedirectForm
 from helper import payer_order_item_from_order_item, buyer_details_from_user, payer_order_item_from_extra_order_price
 from payer_api.postapi import PayerPostAPI
 from payer_api.xml import PayerXMLDocument
-from payer_api.order import (
-    PayerProcessingControl,
-    PayerBuyerDetails,
-    PayerOrderItem,
-    PayerOrder,
-)
+from payer_api.order import PayerProcessingControl, PayerOrder
 
 from payer_api import (
     DEBUG_MODE_SILENT,
@@ -35,15 +26,13 @@ from payer_api import (
     PAYMENT_METHOD_PHONE,
     PAYMENT_METHOD_INVOICE,
 )
-from django.contrib.sites.shortcuts import get_current_site
-from forms import PayerRedirectForm
 
 
 logger = logging.getLogger('django.request')
 
-
 IP_WHITELIST = getattr(settings, 'SHOP_PAYER_BACKEND_IP_WHITELIST', [])
 IP_BLACKLIST = getattr(settings, 'SHOP_PAYER_BACKEND_IP_BLACKLIST', [])
+
 
 class GenericPayerBackend(object):
 
@@ -76,14 +65,14 @@ class GenericPayerBackend(object):
         for ip in IP_BLACKLIST:
             self.api.add_blacklist_ip(ip)
 
-
     def get_url_name(self, name=None):
         if not name:
             return self.url_namespace
         return '%s-%s' % (self.url_namespace, name,)
 
     def get_urls(self):
-        urlpatterns = patterns('',
+        urlpatterns = patterns(
+            '',
             url(r'^$', self.payer_redirect_view, name=self.get_url_name()),
             url(r'^authorize/$', self.callback_notification_view, name=self.get_url_name('authorize')),
             url(r'^settle/$', self.callback_notification_view, name=self.get_url_name('settle')),
@@ -131,7 +120,7 @@ class GenericPayerBackend(object):
             """ Yield successive n-sized chunks from l.
             """
             for i in xrange(0, len(l), n):
-                yield l[i:i+n]
+                yield l[i:i + n]
 
         for info in order.extra_info.all():
             for t in list(chunks(info.text, 255)):
@@ -175,7 +164,6 @@ class GenericPayerBackend(object):
 
         return False
 
-
     def is_valid_callback(self, request):
 
         try:
@@ -186,9 +174,8 @@ class GenericPayerBackend(object):
 
         return False
 
-
     def callback_notification_view(self, request):
-        valid_callback =  self.is_valid_remote_addr(request) and self.is_valid_callback(request)
+        valid_callback = self.is_valid_remote_addr(request) and self.is_valid_callback(request)
 
         if valid_callback:
             try:
@@ -198,15 +185,15 @@ class GenericPayerBackend(object):
 
         return HttpResponse("TRUE" if valid_callback else "FALSE", content_type="text/plain")
 
-
     def handle_order_notifications(self, data):
 
-        order_id = data.get(PayerXMLDocument.ORDER_ID_URL_PARAMETER_NAME, data.get('payer_merchant_reference_id', None))
+        order_id = data.get(PayerXMLDocument.ORDER_ID_URL_PARAMETER_NAME,
+                            data.get('payer_merchant_reference_id', None))
         payment_method = data.get('payer_payment_type', 'unknown')
         transaction_id = data.get('payer_payment_id', data.get('payread_payment_id', None))
-        testmode = bool(data.get('payer_testmode', 'false') == 'true')
         callback_type = data.get('payer_callback_type', None).lower()
-        added_fee = data.get('payer_added_fee', 0)
+        # testmode = bool(data.get('payer_testmode', 'false') == 'true')
+        # added_fee = data.get('payer_added_fee', 0)
 
         if order_id is not None:
 
@@ -232,10 +219,10 @@ class GenericPayerBackend(object):
                 order = Order.objects.get(pk=order_id)
                 order.status = Order.COMPLETED
 
-                self.shop.confirm_payment(order, self.shop.get_order_total(order), transaction_id, u"Payer %s (%s)" % (unicode(self.backend_name).lower(), payment_method,))
+                self.shop.confirm_payment(order, self.shop.get_order_total(order), transaction_id,
+                                          u"Payer %s (%s)" % (unicode(self.backend_name).lower(), payment_method,))
 
                 completed.send(sender=self, order=order)
-
 
 
 class PayerCreditCardPaymentBackend(GenericPayerBackend):

@@ -1,10 +1,7 @@
 from django.conf import settings
-from payer_api.postapi import PayerPostAPI
 from payer_api.order import (
-    PayerProcessingControl,
     PayerBuyerDetails,
     PayerOrderItem,
-    PayerOrder,
 )
 from shop.models import AddressModel
 import django.dispatch
@@ -12,8 +9,15 @@ import django.dispatch
 
 VAT_PERCENTAGE = getattr(settings, 'SHOP_PAYER_BACKEND_DEFAULT_VAT', 25)
 
-populate_buyer_details_dict = django.dispatch.Signal(providing_args=["buyer_details_dict", "user", "address", "order"])
-populate_order_item_dict = django.dispatch.Signal(providing_args=["order_item_dict", "order_item", "extra_order_price"])
+populate_buyer_details_dict = django.dispatch.Signal(providing_args=[
+    "buyer_details_dict",
+    "user",
+    "address",
+    "order"])
+populate_order_item_dict = django.dispatch.Signal(providing_args=[
+    "order_item_dict",
+    "order_item",
+    "extra_order_price"])
 
 
 def payer_order_item_from_order_item(order_item):
@@ -25,7 +29,8 @@ def payer_order_item_from_order_item(order_item):
         'quantity': order_item.quantity,
     }
 
-    populate_order_item_dict.send(sender=PayerOrderItem, order_item_dict=order_item_dict, order_item=order_item, extra_order_price=None)
+    populate_order_item_dict.send(sender=PayerOrderItem, order_item_dict=order_item_dict, order_item=order_item,
+                                  extra_order_price=None)
 
     return PayerOrderItem(**order_item_dict)
 
@@ -39,9 +44,11 @@ def payer_order_item_from_extra_order_price(extra_order_price):
         'quantity': 1,
     }
 
-    populate_order_item_dict.send(sender=PayerOrderItem, order_item_dict=order_item_dict, order_item=None, extra_order_price=extra_order_price)
+    populate_order_item_dict.send(sender=PayerOrderItem, order_item_dict=order_item_dict, order_item=None,
+                                  extra_order_price=extra_order_price)
 
     return PayerOrderItem(**order_item_dict)
+
 
 def buyer_details_from_user(user, order=None):
 
@@ -55,7 +62,7 @@ def buyer_details_from_user(user, order=None):
     seq = shop_address.name.split(" ")
     if len(seq) > 1:
         size = len(seq) / 2
-        first_name, last_name = tuple([" ".join(seq[i:i+size]) for i  in range(0, len(seq), size)])
+        first_name, last_name = tuple([" ".join(seq[i:i + size]) for i in range(0, len(seq), size)])
 
     buyer_details_dict = {
         'first_name': user.first_name or first_name,
@@ -74,8 +81,7 @@ def buyer_details_from_user(user, order=None):
         'customer_id': None,
     }
 
-    populate_buyer_details_dict.send(sender=PayerBuyerDetails, buyer_details_dict=buyer_details_dict, user=user, address=shop_address, order=order)
+    populate_buyer_details_dict.send(sender=PayerBuyerDetails, buyer_details_dict=buyer_details_dict, user=user,
+                                     address=shop_address, order=order)
 
     return PayerBuyerDetails(**buyer_details_dict)
-
-
