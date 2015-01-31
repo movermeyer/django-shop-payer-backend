@@ -4,13 +4,13 @@ flake8:
 	flake8 --ignore=W999 django_shop_payer_backend
 
 test:
-	DJANGO_SETTINGS_MODULE=dummy_project.settings PYTHONPATH=. django-admin.py test
+	DJANGO_SETTINGS_MODULE=dummy_project.settings PYTHONPATH=. django-admin.py test django_shop_payer_backend
 
 coverage:
 	coverage erase
 	DJANGO_SETTINGS_MODULE=dummy_project.settings PYTHONPATH=. \
 		coverage run --branch --source=django_shop_payer_backend \
-		`which django-admin.py` test
+		`which django-admin.py` test django_shop_payer_backend
 	coverage combine
 	coverage html
 	coverage report

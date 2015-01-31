@@ -5,6 +5,9 @@ install:
 script:
   - tox
 env:
+  - PIP_DOWNLOAD_CACHE=pip_cache TOXENV=django14
+  - PIP_DOWNLOAD_CACHE=pip_cache TOXENV=django15
+  - PIP_DOWNLOAD_CACHE=pip_cache TOXENV=django16
   - PIP_DOWNLOAD_CACHE=pip_cache TOXENV=django17
   - PIP_DOWNLOAD_CACHE=pip_cache TOXENV=coverage
   - PIP_DOWNLOAD_CACHE=pip_cache TOXENV=flake8

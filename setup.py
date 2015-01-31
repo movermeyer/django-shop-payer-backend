@@ -10,7 +10,7 @@ CLASSIFIERS = [
 ]
 
 install_requires = [
-    'Django>=1.5',
+    'Django>=1.4',
     'django-shop>=0.2.0',
     'python-payer-api>=0.1.0',
 ]
