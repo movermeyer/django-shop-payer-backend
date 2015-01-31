@@ -95,5 +95,3 @@ There is a similar signal, `populate_order_item_dict`, for order items, allowing
 to modify the data that before the PayerOrderItem object is initialized. This can be
 useful for example if your Product model has a field holding VAT percentages, in
 which case you could inject that value using this method.
-
-[![Build Status](https://travis-ci.org/dessibelle/django-shop-payer-backend.svg?branch=master)](https://travis-ci.org/dessibelle/django-shop-payer-backend)
