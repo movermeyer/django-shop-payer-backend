@@ -11,6 +11,7 @@ Add to installed apps
 ```python
 INSTALLED_APPS = [
     ...
+    'polymorphic',
     'shop'
     'shop.addressmodel',
     'django_shop_payer_backend',
