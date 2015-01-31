@@ -10,7 +10,7 @@ from django.template import RequestContext
 from django.shortcuts import render_to_response
 from shop.models.ordermodel import Order
 from shop.models.cartmodel import Cart
-from shop.util.decorators import on_method, order_required  # , shop_login_required
+from shop.util.decorators import on_method, order_required, shop_login_required
 from shop.order_signals import confirmed, completed
 
 from forms import PayerRedirectForm
