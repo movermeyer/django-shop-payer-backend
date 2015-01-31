@@ -88,7 +88,7 @@ class GenericPayerBackend(object):
             redirect_back_to_shop_url=request.build_absolute_uri(self.shop.get_cancel_url()),
         )
 
-    # @on_method(shop_login_required)
+    @on_method(shop_login_required)
     @on_method(order_required)
     def payer_redirect_view(self, request):
         """
