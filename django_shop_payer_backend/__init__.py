@@ -43,5 +43,5 @@ try:
 
         return errors
 
-except Exception, e:
+except Exception:
     pass

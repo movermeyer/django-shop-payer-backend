@@ -159,7 +159,7 @@ class GenericPayerBackend(object):
             remote_addr = get_remote_addr(request)
 
             return self.api.validate_callback_ip(remote_addr)
-        except Exception, e:
+        except Exception as e:
             logging.error(u"IP address callback did not validate: %s" % unicode(e))
 
         return False
@@ -169,7 +169,7 @@ class GenericPayerBackend(object):
         try:
             url = request.build_absolute_uri(request.get_full_path())
             return self.api.validate_callback_url(url)
-        except Exception, e:
+        except Exception as e:
             logging.error(u"Callback URL did not validate: %s" % unicode(e))
 
         return False
@@ -180,7 +180,7 @@ class GenericPayerBackend(object):
         if valid_callback:
             try:
                 self.handle_order_notifications(request.GET)
-            except Exception, e:
+            except Exception as e:
                 logging.error(u"Error handling order notification: %s" % unicode(e))
 
         return HttpResponse("TRUE" if valid_callback else "FALSE", content_type="text/plain")
