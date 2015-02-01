@@ -1,8 +1,5 @@
-import os
 from distutils.core import setup
-from setuptools import find_packages
-
-
+import os
 VERSION = __import__("django_shop_payer_backend").VERSION
 
 CLASSIFIERS = [
@@ -13,13 +10,31 @@ CLASSIFIERS = [
 ]
 
 install_requires = [
+    'Django>=1.4',
     'django-shop>=0.2.0',
-    'python-payer-api>=0.1.0',
+    'python-payer-api>=0.1.1',
 ]
+
+
+def read_md(path):
+    long_desc = ""
+    if os.path.exists(path):
+        try:
+            from pypandoc import convert
+            long_desc = convert(path, 'rst')
+        except:
+            try:
+                long_desc = open(path, 'r').read()
+            except:
+                pass
+    return long_desc
+
+long_desc = read_md("README.md")
 
 setup(
     name="django-shop-payer-backend",
     description="Payment backend for django SHOP and Payer.",
+    long_description=long_desc,
     version=VERSION,
     author="Simon Fransson",
     author_email="simon@dessibelle.se",

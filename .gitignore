@@ -10,3 +10,7 @@ parts
 *.egg-info
 lib
 lib64
+.tox
+.coverage
+MANIFEST
+htmlcov

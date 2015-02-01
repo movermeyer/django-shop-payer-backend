@@ -1,8 +1,13 @@
+Django SHOP Payer Backend
+=========================
+
+[![Build Status](https://travis-ci.org/dessibelle/django-shop-payer-backend.svg?branch=master)](https://travis-ci.org/dessibelle/django-shop-payer-backend) [![Coverage Status](https://coveralls.io/repos/dessibelle/django-shop-payer-backend/badge.svg)](https://coveralls.io/r/dessibelle/django-shop-payer-backend) [![Latest Version](https://pypip.in/version/django-shop-payer-backend/badge.svg?style=flat)](https://pypi.python.org/pypi/django-shop-payer-backend/)
+
 Django SHOP payment backend for [Payer](http://payer.se). Uses [python-payer-api](https://github.com/dessibelle/python-payer-api) for interacting with the API.
 
 
 Installation
-============
+------------
 
 	pip install django-shop-payer-backend
 
@@ -11,6 +16,7 @@ Add to installed apps
 ```python
 INSTALLED_APPS = [
     ...
+    'polymorphic',
     'shop'
     'shop.addressmodel',
     'django_shop_payer_backend',
@@ -37,7 +43,7 @@ backends such as Paypal etc.
 
 
 Configuration
-=============
+-------------
 
 Add your keys to settings.py
 
@@ -60,7 +66,7 @@ SHOP_PAYER_BACKEND_TEST_MODE = True
 ```
 
 Extensibility
-=============
+-------------
 
 Let's say you have a custom address model based on `shop.addressmodel.models.Address`
 which adds the field `company`. Naturally you would want this data sent to Payer as
