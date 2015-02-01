@@ -2,12 +2,16 @@ from django.test import TestCase
 from decimal import Decimal
 from django.conf import settings
 from helper import buyer_details_from_user
-from django.contrib.auth import get_user_model
+
 from shop.models.ordermodel import Order
 from shop.models import AddressModel
 from django.contrib.auth.models import AnonymousUser
 from helper import populate_buyer_details_dict
-User = get_user_model()
+try:
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+except ImportError
+    from django.contrib.auth.models import User
 
 
 class AddressHelperTestCase(TestCase):
