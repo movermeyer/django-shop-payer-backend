@@ -1,4 +1,5 @@
 from distutils.core import setup
+import setuptools
 import os
 VERSION = __import__("django_shop_payer_backend").VERSION
 
@@ -40,15 +41,12 @@ setup(
     author_email="simon@dessibelle.se",
     url="https://github.com/dessibelle/django-shop-payer-backend",
     download_url="https://github.com/dessibelle/django-shop-payer-backend/archive/%s.tar.gz" % VERSION,
-    packages=['django_shop_payer_backend'],
+    packages=setuptools.find_packages(exclude=['dummy_project']),  # ['django_shop_payer_backend'],
     include_package_data=True,
-    package_data={'django_shop_payer_backend': [
-        'locale/*',
-        'locale/*/*',
-        'locale/*/*/*',
-        'templates/*',
-        'templates/*/*',
-    ]},
+    # package_data={'django_shop_payer_backend': [
+    #     'locale/*/*/*',
+    #     'templates/*/*',
+    # ]},
     install_requires=install_requires,
     classifiers=CLASSIFIERS,
     license="MIT",
