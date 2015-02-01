@@ -1,7 +1,7 @@
 Django SHOP Payer Backend
 =========================
 
-[![Build Status](https://travis-ci.org/dessibelle/django-shop-payer-backend.svg?branch=develop)](https://travis-ci.org/dessibelle/django-shop-payer-backend) [![Coverage Status](https://coveralls.io/repos/dessibelle/django-shop-payer-backend/badge.svg)](https://coveralls.io/r/dessibelle/django-shop-payer-backend) [![Latest Version](https://pypip.in/version/django-shop-payer-backend/badge.svg?style=flat)](https://pypi.python.org/pypi/django-shop-payer-backend/)
+[![Build Status](https://travis-ci.org/dessibelle/django-shop-payer-backend.svg?branch=master)](https://travis-ci.org/dessibelle/django-shop-payer-backend) [![Coverage Status](https://coveralls.io/repos/dessibelle/django-shop-payer-backend/badge.svg)](https://coveralls.io/r/dessibelle/django-shop-payer-backend) [![Latest Version](https://pypip.in/version/django-shop-payer-backend/badge.svg?style=flat)](https://pypi.python.org/pypi/django-shop-payer-backend/)
 
 Django SHOP payment backend for [Payer](http://payer.se). Uses [python-payer-api](https://github.com/dessibelle/python-payer-api) for interacting with the API.
 
