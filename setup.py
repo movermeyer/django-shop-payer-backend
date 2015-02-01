@@ -15,9 +15,16 @@ install_requires = [
     'python-payer-api>=0.1.0',
 ]
 
+try:
+    from pypandoc import convert
+    read_md = lambda f: convert(f, 'rst')
+except ImportError:
+    read_md = lambda f: open(f, 'r').read()
+
 setup(
     name="django-shop-payer-backend",
     description="Payment backend for django SHOP and Payer.",
+    long_description=read_md("README.md"),
     version=VERSION,
     author="Simon Fransson",
     author_email="simon@dessibelle.se",
