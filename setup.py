@@ -1,5 +1,5 @@
 from distutils.core import setup
-
+import os
 VERSION = __import__("django_shop_payer_backend").VERSION
 
 CLASSIFIERS = [
@@ -15,16 +15,26 @@ install_requires = [
     'python-payer-api>=0.1.0',
 ]
 
-try:
-    from pypandoc import convert
-    read_md = lambda f: convert(f, 'rst')
-except ImportError:
-    read_md = lambda f: open(f, 'r').read()
+
+def read_md(path):
+    long_desc = ""
+    if os.path.exists(path):
+        try:
+            from pypandoc import convert
+            long_desc = convert(path, 'rst')
+        except:
+            try:
+                long_desc = open(path, 'r').read()
+            except:
+                pass
+    return long_desc
+
+long_desc = read_md("README.md")
 
 setup(
     name="django-shop-payer-backend",
     description="Payment backend for django SHOP and Payer.",
-    long_description=read_md("README.md"),
+    long_description=long_desc,
     version=VERSION,
     author="Simon Fransson",
     author_email="simon@dessibelle.se",
