@@ -20,10 +20,6 @@ populate_order_item_dict = django.dispatch.Signal(providing_args=[
     "order_item_dict",
     "order_item",
     "extra_order_price"])
-determine_order_address = django.dispatch.Signal(providing_args=[
-    "address",
-    "order",
-    "user"])
 
 
 def payer_order_item_from_order_item(order_item):
@@ -66,8 +62,21 @@ def buyer_details_from_user(user, order=None):
     except:
         pass
 
-    # Override address object via signal
-    determine_order_address.send(sender=None, address=address, order=order, user=user)
+    address_model_callback_path = getattr(settings, 'SHOP_PAYER_BACKEND_ADDRESS_HANDLER', None)
+    if address_model_callback_path:
+        def import_path(name):
+            modname, _, attr = name.rpartition('.')
+            if not modname:
+                # name was just a single module name
+                return __import__(attr)
+            m = __import__(modname, fromlist=[attr])
+            return getattr(m, attr)
+
+        try:
+            address_model_callback = import_path(address_model_callback_path)
+            address = address_model_callback(address=address, order=order, user=user)
+        except:
+            pass
 
     try:
         # Extract address details from address object
@@ -92,8 +101,8 @@ def buyer_details_from_user(user, order=None):
         raise Exception("Could not determine address")
 
     buyer_details_dict = {
-        'first_name': first_name or user.first_name,
-        'last_name': last_name or user.last_name,
+        'first_name': first_name or None,
+        'last_name': last_name or None,
         'address_line_1': None,
         'address_line_2': None,
         'postal_code': None,
@@ -102,11 +111,18 @@ def buyer_details_from_user(user, order=None):
         'phone_home': None,
         'phone_work': None,
         'phone_mobile': None,
-        'email': user.email,
+        'email': None,
         'organisation': None,
         'orgnr': None,
         'customer_id': None,
     }
+
+    for key in ['first_name', 'last_name', 'email']:
+        try:
+            if not buyer_details_dict.get(key, None):
+                buyer_details_dict[key] = getattr(user, key, None)
+        except:
+            pass
 
     buyer_details_dict.update(address_details)
 
@@ -157,60 +173,74 @@ class AddressFormatParser(object):
         return line_fmt, line_vars
 
     def get_address_vars(self):
+        fmt_vars = self._get_format_vars(self.fmt)
         line_fmt, line_vars = self._get_format_mapping(self.fmt)
         lines = self.address.split("\n")
 
-        address_vars = {}
+        patterns = []
 
         for idx, l in enumerate(lines):
-            fmt = line_fmt[idx]
-            keys = line_vars[idx]
 
-            regex = r""
-            key_idx = -1
-            for var in fmt:
+            try:
+                fmt = line_fmt[idx]
+                keys = line_vars[idx]
 
-                if not len(self._get_format_vars(var)):
-                    regex += r"" + var + ""
-                else:
-                    key_idx += 1
-                    key = keys[key_idx]
-                    regex += r"(?P<" + key + ">.+?)"
+                regex = r""
+                key_idx = -1
+                for var in fmt:
 
-            m = re.match(regex, l)
+                    if not len(self._get_format_vars(var)):
+                        regex += var
+                    else:
+                        key_idx += 1
+                        key = keys[key_idx]
+                        regex += r"(?P<" + key + ">.+?)"
 
-            if m and m.groups():
-                values = list(m.groups())
+                if regex:
+                    patterns.append(r"^" + regex + r"$")
 
-                while len(values) < len(keys):
-                    values.append('')
+            except Exception:
+                pass
 
-                address_vars.update(dict(zip(keys, values)))
+        address_vars = {}
+        for regex in patterns:
+            m = re.search(regex, self.address, re.MULTILINE | re.DOTALL)
+
+            if m:
+                for key in fmt_vars:
+                    try:
+                        address_vars[key] = m.group(key)
+                    except:
+                        pass
 
         return address_vars
 
     def get_payer_vars(self):
         address_vars = self.get_address_vars()
 
-        name = address_vars.get('name', None)
-        if name:
-            first_name, last_name = self.get_first_and_last_name(name)
-
-        if first_name or last_name:
-            address_vars.update({
-                'first_name': first_name,
-                'last_name': last_name,
-            })
-            address_vars.pop('name', None)
-
         key_mapping = {
-            'address': 'address_line_1',
+            'name': '%s_name',
+            'address': 'address_line_%d',
             'zipcode': 'postal_code',
             'city': 'city',
         }
 
         for old, new in key_mapping.iteritems():
-            address_vars[new] = address_vars.pop(old, None)
+            value = address_vars.pop(old, None)
+            if value:
+                if old == 'name':
+                    try:
+                        names = dict(zip(
+                            [new % 'first', new % 'last'],
+                            list(self.get_first_and_last_name(value))))
+                        address_vars.update(names)
+                    except:
+                        address_vars[new % 'first'] = value
+                elif old == 'address':
+                    for idx, l in enumerate(value.split("\n", 1)):
+                        address_vars[new % (idx + 1)] = l
+                else:
+                    address_vars[new] = value
 
         return address_vars
 
