@@ -1,0 +1,5 @@
+recursive-include django_shop_payer_backend templates/*
+recursive-include django_shop_payer_backend templates/*/*
+recursive-include django_shop_payer_backend locale/*
+recursive-include django_shop_payer_backend locale/*/*
+recursive-include django_shop_payer_backend locale/*/*/*
