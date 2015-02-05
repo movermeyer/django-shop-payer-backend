@@ -209,7 +209,7 @@ class AddressFormatParser(object):
             if m:
                 for key in fmt_vars:
                     try:
-                        address_vars[key] = m.group(key)
+                        address_vars[key] = m.group(key).strip()
                     except:
                         pass
 
@@ -247,10 +247,19 @@ class AddressFormatParser(object):
     @classmethod
     def get_first_and_last_name(cls, name):
         # Split name in equally large lists
-        first_name = last_name = None
-        seq = name.split(" ")
+        first_name = last_name = name
+
+        name = re.sub(r"\.+", " ", name)
+        name = re.sub(r"[_\d]+", "", name)
+        name = name.title()
+
+        seq = filter(None, re.split(r"\s+", name))
+
+        def chunks(l):
+            yield " ".join(l[:len(l) / 2])
+            yield " ".join(l[len(l) / 2:])
+
         if len(seq) > 1:
-            size = len(seq) / 2
-            first_name, last_name = tuple([" ".join(seq[i:i + size]) for i in range(0, len(seq), size)])
+            first_name, last_name = tuple(chunks(seq))
 
         return first_name, last_name
