@@ -58,7 +58,7 @@ def buyer_details_from_user(user, order=None):
 
     try:
         # Extract address object from user
-        address = AddressModel.objects.filter(user_billing=user)[0]
+        address = AddressModel.objects.exclude(user__isnull=True).filter(user_billing=user)[0]
     except:
         pass
 
