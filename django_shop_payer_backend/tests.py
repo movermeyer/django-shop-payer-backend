@@ -14,6 +14,17 @@ except ImportError:
     from django.contrib.auth.models import User
 
 
+def override_address(*args, **kwargs):
+    address = AddressModel.objects.create(
+        name="Peter Parker",
+        address="Back Street 987",
+        zip_code="98765",
+        city="Somewhere",
+        state="N/A",
+    )
+    return address
+
+
 class AddressHelperTestCase(TestCase):
 
     def setUp(self):
@@ -200,12 +211,56 @@ State: %(state)s"""
         test_template(CUSTOM_ADDRESS_TEMPLATE)
 
 
-def override_address(*args, **kwargs):
-    address = AddressModel.objects.create(
-        name="Peter Parker",
-        address="Back Street 987",
-        zip_code="98765",
-        city="Somewhere",
-        state="N/A",
-    )
-    return address
+class OrderItemTestCase(TestCase):
+
+    def setUp(self):
+        from shop.models.ordermodel import OrderItem, ExtraOrderPriceField
+        from shop.models import Product
+
+        self.order = Order.objects.create(
+            order_subtotal=0.0,
+            order_total=0.0,
+        )
+
+        self.product = Product.objects.create(
+            name="A product",
+            slug='a-product',
+            active=True,
+            unit_price=123.45,
+        )
+
+        self.order_item = OrderItem.objects.create(
+            order=self.order,
+            product_reference=self.product.get_product_reference(),
+            product_name=self.product.get_name(),
+            product=self.product,
+            unit_price=self.product.get_price(),
+            quantity=4,
+            line_subtotal=self.product.get_price() * 4,
+            line_total=self.product.get_price() * 4,
+        )
+
+        self.extra_order_price_field = ExtraOrderPriceField(
+            order=self.order,
+            label="Shipping",
+            value=12.34,
+        )
+
+    def test_order_item_from_order_item(self):
+        from django_shop_payer_backend.helper import payer_order_item_from_order_item
+        item = payer_order_item_from_order_item(self.order_item)
+
+        # This is NOT line_subtotal/line_total, Payer does the summing.
+        self.assertEquals(item.price_including_vat, 123.45)
+        self.assertEquals(item.description, "A product")
+        self.assertEquals(item.vat_percentage, 25.0)
+        self.assertEquals(item.quantity, 4)
+
+    def test_order_item_from_extra_order_price(self):
+        from django_shop_payer_backend.helper import payer_order_item_from_extra_order_price
+        item = payer_order_item_from_extra_order_price(self.extra_order_price_field)
+
+        self.assertEquals(item.price_including_vat, 12.34)
+        self.assertEquals(item.description, "Shipping")
+        self.assertEquals(item.vat_percentage, 25.0)
+        self.assertEquals(item.quantity, 1)
