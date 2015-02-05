@@ -1,3 +1,4 @@
+# -*- encoding: utf-8 -*-
 from django.test import TestCase
 from decimal import Decimal
 from helper import buyer_details_from_user
@@ -121,6 +122,82 @@ class AddressHelperTestCase(TestCase):
         self.assertEquals(buyer.email, "test@example.com")
         self.assertEquals(buyer.organisation, "The Company Inc.")
         populate_buyer_details_dict.disconnect(self.add_additional_buyer_details)
+
+    def test_name_parsing(self):
+        from django_shop_payer_backend.helper import AddressFormatParser
+
+        self.assertEquals(
+            AddressFormatParser.get_first_and_last_name("Peter Parker"),
+            ("Peter", "Parker",))
+        self.assertEquals(
+            AddressFormatParser.get_first_and_last_name("Mary Jane Watson"),
+            ("Mary", "Jane Watson",))
+        self.assertEquals(
+            AddressFormatParser.get_first_and_last_name("Mary-Kate Olsen"),
+            ("Mary-Kate", "Olsen",))
+        self.assertEquals(
+            AddressFormatParser.get_first_and_last_name(u"Gabriel García Márquez"),
+            (u"Gabriel", u"García Márquez",))
+        self.assertEquals(
+            AddressFormatParser.get_first_and_last_name(u"Gabriel José de la Concordia García Márquez"),
+            (u"Gabriel José De", u"La Concordia García Márquez",))
+        self.assertEquals(
+            AddressFormatParser.get_first_and_last_name("Kirsten Moore-Towers"),
+            ("Kirsten", "Moore-Towers",))
+        self.assertEquals(
+            AddressFormatParser.get_first_and_last_name("Ralph Vaughan Williams"),
+            ("Ralph", "Vaughan Williams",))
+
+    def test_address_parsing(self):
+        from shop.addressmodel.models import ADDRESS_TEMPLATE
+        from django_shop_payer_backend.helper import AddressFormatParser
+
+        CUSTOM_ADDRESS_TEMPLATE = """Name: %(name)s,
+Address: %(address)s,
+City: %(city)s %(zipcode)s,
+State: %(state)s"""
+
+        def test_template(template):
+
+            def filter_address_vars(address_vars, template):
+                expected_keys = AddressFormatParser("", template)._get_format_vars(template)
+                address_vars = dict((k, v) for k, v in address_vars.iteritems() if k in expected_keys)
+                return address_vars
+
+            # All vars
+            address_vars = {
+                'name': u"P. Sherman",
+                'address': u"42 Wallaby Way",
+                'zipcode': u"2123",
+                'city': u"Sydney",
+                'state': u"NSW",
+                'country': u"Australia",
+            }
+            address_vars = filter_address_vars(address_vars, template)
+            address = template % address_vars
+            parser = AddressFormatParser(address, template)
+
+            self.assertEquals(parser.get_address_vars(), address_vars)
+
+            # Missing vars
+            address_vars = {
+                'name': u"P. Sherman",
+                'address': u"42 Wallaby Way",
+                'zipcode': u"2123",
+                'city': u"Sydney",
+                'state': u"",
+                'country': u"",
+            }
+            address_vars = filter_address_vars(address_vars, template)
+            address = template % address_vars
+            parser = AddressFormatParser(address, template)
+
+            actual_vars = dict((k, v) for k, v in parser.get_address_vars().iteritems() if v)
+            expected_vars = dict((k, v) for k, v in address_vars.iteritems() if v)
+            self.assertEquals(expected_vars, actual_vars)
+
+        test_template(ADDRESS_TEMPLATE)
+        test_template(CUSTOM_ADDRESS_TEMPLATE)
 
 
 def override_address(*args, **kwargs):
