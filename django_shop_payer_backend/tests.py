@@ -135,7 +135,7 @@ class AddressHelperTestCase(TestCase):
         populate_buyer_details_dict.disconnect(self.add_additional_buyer_details)
 
     def test_name_parsing(self):
-        from django_shop_payer_backend.helper import AddressFormatParser
+        from helper import AddressFormatParser
 
         self.assertEquals(
             AddressFormatParser.get_first_and_last_name("Peter Parker"),
@@ -161,7 +161,7 @@ class AddressHelperTestCase(TestCase):
 
     def test_address_parsing(self):
         from shop.addressmodel.models import ADDRESS_TEMPLATE
-        from django_shop_payer_backend.helper import AddressFormatParser
+        from helper import AddressFormatParser
 
         CUSTOM_ADDRESS_TEMPLATE = """Name: %(name)s,
 Address: %(address)s,
@@ -218,15 +218,15 @@ class OrderItemTestCase(TestCase):
         from shop.models import Product
 
         self.order = Order.objects.create(
-            order_subtotal=0.0,
-            order_total=0.0,
+            order_subtotal=Decimal('0'),
+            order_total=Decimal('0'),
         )
 
         self.product = Product.objects.create(
             name="A product",
             slug='a-product',
             active=True,
-            unit_price=123.45,
+            unit_price=Decimal('123.45'),
         )
 
         self.order_item = OrderItem.objects.create(
@@ -243,11 +243,11 @@ class OrderItemTestCase(TestCase):
         self.extra_order_price_field = ExtraOrderPriceField(
             order=self.order,
             label="Shipping",
-            value=12.34,
+            value=Decimal('12.34'),
         )
 
     def test_order_item_from_order_item(self):
-        from django_shop_payer_backend.helper import payer_order_item_from_order_item
+        from helper import payer_order_item_from_order_item
         item = payer_order_item_from_order_item(self.order_item)
 
         # This is NOT line_subtotal/line_total, Payer does the summing.
@@ -257,7 +257,7 @@ class OrderItemTestCase(TestCase):
         self.assertEquals(item.quantity, 4)
 
     def test_order_item_from_extra_order_price(self):
-        from django_shop_payer_backend.helper import payer_order_item_from_extra_order_price
+        from helper import payer_order_item_from_extra_order_price
         item = payer_order_item_from_extra_order_price(self.extra_order_price_field)
 
         self.assertEquals(item.price_including_vat, 12.34)
