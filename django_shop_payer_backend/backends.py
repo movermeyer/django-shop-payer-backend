@@ -14,7 +14,12 @@ from shop.util.decorators import on_method, order_required, shop_login_required
 from shop.order_signals import confirmed, completed
 
 from forms import PayerRedirectForm
-from helper import payer_order_item_from_order_item, buyer_details_from_user, payer_order_item_from_extra_order_price
+from helper import (
+    payer_order_item_from_order_item,
+    buyer_details_from_user,
+    payer_order_item_from_extra_order_price,
+    string_chunks,
+)
 from payer_api.postapi import PayerPostAPI
 from payer_api.xml import PayerXMLDocument
 from payer_api.order import PayerProcessingControl, PayerOrder
@@ -29,9 +34,6 @@ from payer_api import (
 
 
 logger = logging.getLogger('django.request')
-
-IP_WHITELIST = getattr(settings, 'SHOP_PAYER_BACKEND_IP_WHITELIST', [])
-IP_BLACKLIST = getattr(settings, 'SHOP_PAYER_BACKEND_IP_BLACKLIST', [])
 
 
 class GenericPayerBackend(object):
@@ -59,10 +61,10 @@ class GenericPayerBackend(object):
             hide_details=getattr(settings, 'SHOP_PAYER_BACKEND_HIDE_DETAILS', False),
         )
 
-        for ip in IP_WHITELIST:
+        for ip in getattr(settings, 'SHOP_PAYER_BACKEND_IP_WHITELIST', []):
             self.api.add_whitelist_ip(ip)
 
-        for ip in IP_BLACKLIST:
+        for ip in getattr(settings, 'SHOP_PAYER_BACKEND_IP_BLACKLIST', []):
             self.api.add_blacklist_ip(ip)
 
     def get_url_name(self, name=None):
@@ -116,14 +118,8 @@ class GenericPayerBackend(object):
         for extra_order_price in order.extraorderpricefield_set.all():
             payer_order.add_order_item(payer_order_item_from_extra_order_price(extra_order_price))
 
-        def chunks(l, n):
-            """ Yield successive n-sized chunks from l.
-            """
-            for i in xrange(0, len(l), n):
-                yield l[i:i + n]
-
         for info in order.extra_info.all():
-            for t in list(chunks(info.text, 255)):
+            for t in list(string_chunks(info.text, 255)):
                 payer_order.add_info_line(t)
 
         self.api.set_processing_control(self.get_processing_control(request))
@@ -191,7 +187,7 @@ class GenericPayerBackend(object):
                             data.get('payer_merchant_reference_id', None))
         payment_method = data.get('payer_payment_type', 'unknown')
         transaction_id = data.get('payer_payment_id', data.get('payread_payment_id', None))
-        callback_type = data.get('payer_callback_type', None).lower()
+        callback_type = data.get('payer_callback_type', '').lower()
         # testmode = bool(data.get('payer_testmode', 'false') == 'true')
         # added_fee = data.get('payer_added_fee', 0)
 
@@ -216,7 +212,6 @@ class GenericPayerBackend(object):
             elif callback_type == 'settle':
 
                 # Payment completed, update order status, add payment
-                order = Order.objects.get(pk=order_id)
                 order.status = Order.COMPLETED
 
                 self.shop.confirm_payment(order, self.shop.get_order_total(order), transaction_id,
@@ -250,9 +245,6 @@ class PayerPhonePaymentBackend(GenericPayerBackend):
     payment_methods = [
         PAYMENT_METHOD_PHONE,
     ]
-
-    def __init__(self):
-        raise NotImplementedError("Not implemented yet")
 
 
 class PayerInvoicePaymentBackend(GenericPayerBackend):

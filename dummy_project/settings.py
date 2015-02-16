@@ -35,6 +35,14 @@ MIDDLEWARE_CLASSES = [
     'django.contrib.messages.middleware.MessageMiddleware',
 ]
 
+SHOP_PAYMENT_BACKENDS = [
+    'django_shop_payer_backend.backends.GenericPayerBackend',
+    'django_shop_payer_backend.backends.PayerCreditCardPaymentBackend',
+    'django_shop_payer_backend.backends.PayerBankPaymentBackend',
+    'django_shop_payer_backend.backends.PayerPhonePaymentBackend',
+    'django_shop_payer_backend.backends.PayerInvoicePaymentBackend',
+]
+
 SHOP_PAYER_BACKEND_AGENT_ID = "AGENT_ID"
 SHOP_PAYER_BACKEND_ID1 = "6866ef97a972ba3a2c6ff8bb2812981054770162"
 SHOP_PAYER_BACKEND_ID2 = "1388ac756f07b0dda2961436ba8596c7b7995e94"

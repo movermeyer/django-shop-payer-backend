@@ -9,6 +9,10 @@ import django.dispatch
 import re
 
 
+class AddressParsingFailedException(Exception):
+    pass
+
+
 VAT_PERCENTAGE = getattr(settings, 'SHOP_PAYER_BACKEND_DEFAULT_VAT', 25)
 
 populate_buyer_details_dict = django.dispatch.Signal(providing_args=[
@@ -20,6 +24,13 @@ populate_order_item_dict = django.dispatch.Signal(providing_args=[
     "order_item_dict",
     "order_item",
     "extra_order_price"])
+
+
+def string_chunks(l, n):
+    """ Yield successive n-sized chunks from l.
+    """
+    for i in xrange(0, len(l), n):
+        yield l[i:i + n]
 
 
 def payer_order_item_from_order_item(order_item):
@@ -52,6 +63,16 @@ def payer_order_item_from_extra_order_price(extra_order_price):
     return PayerOrderItem(**order_item_dict)
 
 
+def _import_path(name):
+    name = name or ""
+    modname, _, attr = name.rpartition('.')
+    if not modname:
+        # name was just a single module name
+        return __import__(attr)
+    m = __import__(modname, fromlist=[attr])
+    return getattr(m, attr)
+
+
 def buyer_details_from_user(user, order=None):
 
     first_name = last_name = address = None
@@ -64,19 +85,8 @@ def buyer_details_from_user(user, order=None):
 
     address_model_callback_path = getattr(settings, 'SHOP_PAYER_BACKEND_ADDRESS_HANDLER', None)
     if address_model_callback_path:
-        def import_path(name):
-            modname, _, attr = name.rpartition('.')
-            if not modname:
-                # name was just a single module name
-                return __import__(attr)
-            m = __import__(modname, fromlist=[attr])
-            return getattr(m, attr)
-
-        try:
-            address_model_callback = import_path(address_model_callback_path)
-            address = address_model_callback(address=address, order=order, user=user)
-        except:
-            pass
+        address_model_callback = _import_path(address_model_callback_path)
+        address = address_model_callback(address=address, order=order, user=user)
 
     try:
         # Extract address details from address object
@@ -91,14 +101,15 @@ def buyer_details_from_user(user, order=None):
         }
     except:
         # Extract address details from order.billing_address_text
-        parser = AddressFormatParser(order.billing_address_text, ADDRESS_TEMPLATE)
-        address_details = parser.get_payer_vars()
+        if order is not None:
+            parser = AddressFormatParser(order.billing_address_text, ADDRESS_TEMPLATE)
+            address_details = parser.get_payer_vars()
 
     try:
         # Make sure, in the end, we actually do have address details
         assert address_details
     except:
-        raise Exception("Could not determine address")
+        raise AddressParsingFailedException("Could not determine address")
 
     buyer_details_dict = {
         'first_name': first_name or None,
@@ -118,11 +129,8 @@ def buyer_details_from_user(user, order=None):
     }
 
     for key in ['first_name', 'last_name', 'email']:
-        try:
-            if not buyer_details_dict.get(key, None):
-                buyer_details_dict[key] = getattr(user, key, None)
-        except:
-            pass
+        if not buyer_details_dict.get(key, False) and hasattr(user, key):
+            buyer_details_dict[key] = getattr(user, key, None)
 
     buyer_details_dict.update(address_details)
 
@@ -175,7 +183,7 @@ class AddressFormatParser(object):
     def get_address_vars(self):
         fmt_vars = self._get_format_vars(self.fmt)
         line_fmt, line_vars = self._get_format_mapping(self.fmt)
-        lines = self.address.split("\n")
+        lines = (self.address or "").split("\n")
 
         patterns = []
 
@@ -229,13 +237,10 @@ class AddressFormatParser(object):
             value = address_vars.pop(old, None)
             if value:
                 if old == 'name':
-                    try:
-                        names = dict(zip(
-                            [new % 'first', new % 'last'],
-                            list(self.get_first_and_last_name(value))))
-                        address_vars.update(names)
-                    except:
-                        address_vars[new % 'first'] = value
+                    names = dict(zip(
+                        [new % 'first', new % 'last'],
+                        list(self.get_first_and_last_name(value))))
+                    address_vars.update(names)
                 elif old == 'address':
                     for idx, l in enumerate(value.split("\n", 1)):
                         address_vars[new % (idx + 1)] = l
@@ -246,10 +251,12 @@ class AddressFormatParser(object):
 
     @classmethod
     def get_first_and_last_name(cls, name):
-        # Split name in equally large lists
-        first_name = last_name = name
+        """Split name in equally large portions. Always returns a tuple of two strings."""
+        name = name or ""
+        first_name = name
+        last_name = ""
 
-        name = re.sub(r"\.+", " ", name)
+        name = re.sub(r"(\w)\.(\w)", r"\1 \2", name)
         name = re.sub(r"[_\d]+", "", name)
         name = name.title()
 
