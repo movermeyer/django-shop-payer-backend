@@ -1,4 +1,4 @@
-VERSION = '0.1.6'
+VERSION = '0.1.7'
 
 default_app_config = 'django_shop_payer_backend.apps.DjangoShopPayerBackend'
 
