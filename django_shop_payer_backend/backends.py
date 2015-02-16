@@ -30,9 +30,6 @@ from payer_api import (
 
 logger = logging.getLogger('django.request')
 
-IP_WHITELIST = getattr(settings, 'SHOP_PAYER_BACKEND_IP_WHITELIST', [])
-IP_BLACKLIST = getattr(settings, 'SHOP_PAYER_BACKEND_IP_BLACKLIST', [])
-
 
 class GenericPayerBackend(object):
 
@@ -59,10 +56,10 @@ class GenericPayerBackend(object):
             hide_details=getattr(settings, 'SHOP_PAYER_BACKEND_HIDE_DETAILS', False),
         )
 
-        for ip in IP_WHITELIST:
+        for ip in getattr(settings, 'SHOP_PAYER_BACKEND_IP_WHITELIST', []):
             self.api.add_whitelist_ip(ip)
 
-        for ip in IP_BLACKLIST:
+        for ip in getattr(settings, 'SHOP_PAYER_BACKEND_IP_BLACKLIST', []):
             self.api.add_blacklist_ip(ip)
 
     def get_url_name(self, name=None):
@@ -191,7 +188,7 @@ class GenericPayerBackend(object):
                             data.get('payer_merchant_reference_id', None))
         payment_method = data.get('payer_payment_type', 'unknown')
         transaction_id = data.get('payer_payment_id', data.get('payread_payment_id', None))
-        callback_type = data.get('payer_callback_type', None).lower()
+        callback_type = data.get('payer_callback_type', '').lower()
         # testmode = bool(data.get('payer_testmode', 'false') == 'true')
         # added_fee = data.get('payer_added_fee', 0)
 
@@ -216,7 +213,6 @@ class GenericPayerBackend(object):
             elif callback_type == 'settle':
 
                 # Payment completed, update order status, add payment
-                order = Order.objects.get(pk=order_id)
                 order.status = Order.COMPLETED
 
                 self.shop.confirm_payment(order, self.shop.get_order_total(order), transaction_id,
@@ -250,9 +246,6 @@ class PayerPhonePaymentBackend(GenericPayerBackend):
     payment_methods = [
         PAYMENT_METHOD_PHONE,
     ]
-
-    def __init__(self):
-        raise NotImplementedError("Not implemented yet")
 
 
 class PayerInvoicePaymentBackend(GenericPayerBackend):

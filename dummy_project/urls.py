@@ -1,5 +1,6 @@
-from django.conf.urls import patterns  # , include, url
+from django.conf.urls import patterns, include  # , url
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
+from shop import urls as shop_urls
 
 # Uncomment the next two lines to enable the admin:
 from django.contrib import admin
@@ -12,5 +13,8 @@ urlpatterns = patterns(
 
     # Uncomment the next line to enable the admin:
     # url(r'^admin/', include(admin.site.urls)),
+
+    (r'^', include(shop_urls)),
+
 )
 urlpatterns += staticfiles_urlpatterns()
