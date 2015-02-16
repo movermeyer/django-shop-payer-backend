@@ -8,6 +8,7 @@ from shop.addressmodel.models import Country
 from shop.models.ordermodel import (
     Order,
     OrderItem,
+    OrderExtraInfo,
     ExtraOrderItemPriceField,
     ExtraOrderPriceField,
 )
@@ -403,6 +404,11 @@ class BaseBackendTestCase(TestCase):
         self.orderitem.line_total = Decimal('110')
         self.orderitem.save()
 
+        oi = OrderExtraInfo()
+        oi.order = self.order
+        oi.text = "buffalo " * 64
+        oi.save()
+
         eoif = ExtraOrderItemPriceField()
         eoif.order_item = self.orderitem
         eoif.label = 'Fake extra field'
@@ -561,36 +567,37 @@ class BackendTestCase(BaseBackendTestCase):
         self.assertEqual(pc.settle_notification_url, urljoin(base_url, reverse('%s-%s' % ("payer", "settle",))))
         self.assertEqual(pc.redirect_back_to_shop_url, urljoin(base_url, self.shop.get_cancel_url()))
 
+    def assertOrderDetails(self, request):
+        order = self.backend.shop.get_order(request)
+        order_id = self.backend.shop.get_order_unique_id(order)
+
+        try:
+            assert order
+        except:
+            self.fail("payer_redirect_view could not fetch order from request.")
+
+        self.assertEqual(order_id, order_id)
+
+        response = self.backend.payer_redirect_view(request)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("text/html", response['Content-Type'])
+
     def test_redirect_view_with_user(self):
         request = self.factory.get("/")
         request.user = self.user
 
         self.assertTrue(request.user.is_authenticated())
-
-        view = self.backend.payer_redirect_view(request)
-        order = self.backend.shop.get_order(request)
-
-        # TODO: Make some assertions
+        self.assertOrderDetails(request)
 
     def test_redirect_view_with_anonymous_user(self):
         request = self.factory.get("/")
         request.user = AnonymousUser()
 
+        setattr(request, 'session', {'order_id': self.order.id})
+        self.assertEqual(request.session.get('order_id', None), self.order.id)
+
         self.assertFalse(request.user.is_authenticated())
-
-        view = self.backend.payer_redirect_view(request)
-        order = self.backend.shop.get_order(request)
-
-        # TODO: Make some assertions
-
-    def test_redirect_view_without_user(self):
-        request = self.factory.get("/")
-        request.user = None
-
-        view = self.backend.payer_redirect_view(request)
-        order = self.backend.shop.get_order(request)
-
-        # TODO: Make some assertions
+        self.assertOrderDetails(request)
 
     def test_ip_validation(self):
 
@@ -718,7 +725,8 @@ class BackendTestCase(BaseBackendTestCase):
         order = Order.objects.get(pk=self.order.id)
         self.assertEqual(order.status, Order.CONFIRMED)
 
-        test_cart = lambda: Cart.objects.get(pk=order.cart_pk)
+        def test_cart():
+            Cart.objects.get(pk=order.cart_pk)
         self.assertRaises(Cart.DoesNotExist, test_cart)
 
         # Settle notification

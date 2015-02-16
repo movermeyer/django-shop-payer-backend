@@ -14,7 +14,12 @@ from shop.util.decorators import on_method, order_required, shop_login_required
 from shop.order_signals import confirmed, completed
 
 from forms import PayerRedirectForm
-from helper import payer_order_item_from_order_item, buyer_details_from_user, payer_order_item_from_extra_order_price
+from helper import (
+    payer_order_item_from_order_item,
+    buyer_details_from_user,
+    payer_order_item_from_extra_order_price,
+    string_chunks,
+)
 from payer_api.postapi import PayerPostAPI
 from payer_api.xml import PayerXMLDocument
 from payer_api.order import PayerProcessingControl, PayerOrder
@@ -113,14 +118,8 @@ class GenericPayerBackend(object):
         for extra_order_price in order.extraorderpricefield_set.all():
             payer_order.add_order_item(payer_order_item_from_extra_order_price(extra_order_price))
 
-        def chunks(l, n):
-            """ Yield successive n-sized chunks from l.
-            """
-            for i in xrange(0, len(l), n):
-                yield l[i:i + n]
-
         for info in order.extra_info.all():
-            for t in list(chunks(info.text, 255)):
+            for t in list(string_chunks(info.text, 255)):
                 payer_order.add_info_line(t)
 
         self.api.set_processing_control(self.get_processing_control(request))
